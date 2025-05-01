@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Reading Support System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Smart Reading Support System</h1>
+        <p>Simplify reading, understand better, listen easier.</p>
+    </header>
+
+    <main>
+        <section class="input-section">
+            <section class="upload-section">
+                <h2>Upload a File (PDF) or Paste Text</h2>
+                <input type="file" id="fileInput" accept=".pdf">
+            </section>
+            
+            <textarea id="inputText" placeholder="Paste your text here..."></textarea>
+            <div class="button-group">
+                <button onclick="summarize()">Summarize</button>
+                <button onclick="extractKeywords()">Extract Keywords</button>
+                <button onclick="findDefinitions()">Find Definitions</button>
+                <button onclick="generateAudio()">Generate Audio</button>
+                <button onclick="askQuestion()">Ask Question</button>
+            </div>
+        </section>
+
+        <section class="output-section">
+            <div id="loadingSpinner" style="display: none; text-align: center; font-size: 1.2rem;">
+                ⏳ Loading...
+            </div>
+
+            <h2>Results:</h2>
+            <div class="output-box">
+                <h3>Summary</h3>
+                <p id="summaryOutput"></p>
+            </div>
+            <div class="output-box">
+                <h3>Keywords</h3>
+                <p id="keywordsOutput"></p>
+            </div>
+            <div class="output-box">
+                <h3>Definitions</h3><form onsubmit="fetchDefinition(event)">
+                    <input type="text" id="wordInput" placeholder="Enter a word..." required>
+                    <button type="submit">Get Definition</button>
+                </form>
+            
+                <div id="definitionOutput" style="margin-top:20px;"></div>
+                <pre id="definitionsOutput"></pre>
+            </div>
+            <div class="output-box">
+                <h3>Audio Summary</h3>
+                <audio id="audioOutput" controls></audio>
+            </div>
+            <div class="output-box">
+                <h3>Sample Question</h3>
+                <form id="qa-form">
+                    <input type="text" id="question" placeholder="Ask a question" required>
+                    <button type="submit">Submit</button>
+                  </form>
+                  <div id="answer"></div>
+                <p id="qaOutput"></p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Made with ❤️ using AI and NLP</p>
+    </footer>
+
+    <script>
+        async function getTextInput() {
+            const file = document.getElementById('fileInput').files[0];
+            const text = document.getElementById('inputText').value.trim();
+
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('/upload_pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                return data.text; // expecting the server to return extracted text
+            } else if (text) {
+                return text;
+            } else {
+                alert("Please upload a PDF or enter some text.");
+                return null;
+            }
+        }
+
+        async function summarize() {
+            const text = await getTextInput();
+            if (!text) return;
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+
+            const response = await fetch('/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await response.json();
+
+            document.getElementById('summaryOutput').innerText = data.summary;
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        async function extractKeywords() {
+    const text = await getTextInput();
+    if (!text) return;
+
+    document.getElementById('loadingSpinner').style.display = 'block';
+
+    const response = await fetch('/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
+    const data = await response.json();
+
+    if (data.keywords && Array.isArray(data.keywords)) {
+        document.getElementById('keywordsOutput').innerText = "" + data.keywords.join(', ');
+    } else {
+        document.getElementById('keywordsOutput').innerText = "No keywords found.";
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'none';
+}
+
+
+        async function findDefinitions() {
+            const text = await getTextInput();
+            if (!text) return;
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+
+            const response = await fetch('/definitions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await response.json();
+
+            document.getElementById('definitionsOutput').innerText = JSON.stringify(data.definitions, null, 2);
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        async function generateAudio() {
+            const text = await getTextInput();
+            if (!text) return;
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+
+            const response = await fetch('/audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await response.json();
+
+            document.getElementById('audioOutput').src = data.audio_url;
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+       /*async function askQuestion() {
+            const text = await getTextInput();
+            if (!text) return;
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+
+            const response = await fetch('/question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await response.json();
+
+            document.getElementById('qaOutput').innerText = data.question;
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }*/
+    </script>
+    <script>
+        async function fetchDefinition(event) {
+            event.preventDefault(); // Stop form from refreshing the page
+
+            const word = document.getElementById('wordInput').value;
+
+            const response = await fetch('/definitions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ word: word })
+            });
+
+            const result = await response.json();
+
+            const output = document.getElementById('definitionOutput');
+
+            if (response.ok) {
+                output.innerHTML = `<strong>Definitions:</strong><ul>${result.definitions.map(def => `<li>${def}</li>`).join('')}</ul>`;
+            } else {
+                output.innerHTML = `<span style="color:red;">${result.error}</span>`;
+            }
+        }
+        document.getElementById('qa-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const question = document.getElementById('question').value;
+    const response = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+    });
+    const data = await response.json();
+    document.getElementById('answer').innerText = data.answer || data.error;
+});
+    </script>
+
+</body>
+</html>
